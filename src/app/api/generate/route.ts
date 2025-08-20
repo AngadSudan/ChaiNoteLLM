@@ -18,21 +18,26 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
-    const uploadDir = path.join(process.cwd(), "uploads");
-    await fs.mkdir(uploadDir, { recursive: true });
-
+    // ✅ Use /tmp for ephemeral writes
+    const uploadDir = "/tmp";
     const filePath = path.join(uploadDir, file.name);
     await fs.writeFile(filePath, buffer);
 
     if (file.name.endsWith(".pdf")) {
       await vectorizePDF(filePath, userCollection);
     } else if (file.name.endsWith(".txt")) {
-      await vectorizeText(await fs.readFile(filePath, "utf8"), userCollection);
+      const content = await fs.readFile(filePath, "utf8");
+      await vectorizeText(content, userCollection);
     }
 
     return NextResponse.json({ success: true, type: "file", file: file.name });
   }
 
+  const text = formData.get("text") as File | null;
+  if (text) {
+    await vectorizeText(text as any, userCollection);
+    return NextResponse.json({ success: true, type: "text", file: text });
+  }
   const url = formData.get("url") as string | null;
   if (url) {
     await vectorizeURL(url, userCollection);
